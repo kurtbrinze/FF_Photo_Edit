@@ -178,12 +178,14 @@ dialog img{width:100%;border-radius:8px;display:block;margin:10px 0}
         <div class="lgctl" id="lgCtl" hidden>
           <p class="note" id="lgName" style="color:var(--ink)"></p>
           <div class="row"><label for="lw">Tamaño del logo <output id="lwo"></output></label><input id="lw" type="range" min="8" max="100" step="1"></div>
+          <div class="row"><label for="lr">Girar <output id="lro"></output></label><input id="lr" type="range" min="-180" max="180" step="1"></div>
           <div class="seg" id="lgMode" hidden>
             <button id="lmAll" aria-pressed="true">Quitar todo el fondo</button>
             <button id="lmEdge" aria-pressed="false">Solo el exterior</button>
           </div>
           <div class="btns">
             <button class="btn" id="lgCenter">Centrar</button>
+            <button class="btn" id="lgStraight">Enderezar</button>
             <button class="btn" id="lgOff">Quitar de la foto</button>
             <button class="btn" id="lgDel" hidden>Eliminar logo</button>
           </div>
@@ -489,7 +491,7 @@ function select(i){state.cur=i;
   const it=state.items[i];if(it){touch(it);manage();if(it.compact)reopen(it)}
   renderStrip();syncControls();draw()}
 /* Saber si la versión actual de una prenda ya se guardó */
-function sig(it){return JSON.stringify([it.p,state.bg,state.logos.map(l=>l.on?[l.id,+l.x.toFixed(4),+l.y.toFixed(4),+l.w.toFixed(4),l.mode]:0),it.ev])}
+function sig(it){return JSON.stringify([it.p,state.bg,state.logos.map(l=>l.on?[l.id,+l.x.toFixed(4),+l.y.toFixed(4),+l.w.toFixed(4),+(l.r||0).toFixed(3),l.mode]:0),it.ev])}
 function isSaved(it){return !!it.savedSig&&it.savedSig===sig(it)}
 function markSaved(){const it=cur(),b=document.querySelector('.thumb[aria-current="true"] .ok');if(b)b.hidden=!(it&&isSaved(it))}
 
@@ -516,9 +518,11 @@ function paintProduct(g,CW,CH,it,preview){
 }
 function logoRect(lg,CW,CH){const w=lg.w*CW,h=w*lg.cv.height/lg.cv.width;return{x:lg.x*CW-w/2,y:lg.y*CH-h/2,w,h}}
 function paintLogos(g,CW,CH,preview){
-  state.logos.forEach((lg,i)=>{if(!lg.on||!lg.cv)return;const r=logoRect(lg,CW,CH);g.drawImage(lg.cv,r.x,r.y,r.w,r.h);
-    if(preview&&state.tab==="logos"&&i===state.al){const d=Math.max(1,CW/400);g.save();g.lineWidth=2*d;g.strokeStyle="#fff";g.setLineDash([7*d,5*d]);
-      g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=3*d;g.strokeRect(r.x-4*d,r.y-4*d,r.w+8*d,r.h+8*d);g.restore()}});
+  state.logos.forEach((lg,i)=>{if(!lg.on||!lg.cv)return;const r=logoRect(lg,CW,CH);
+    g.save();g.translate(r.x+r.w/2,r.y+r.h/2);g.rotate(lg.r||0);g.drawImage(lg.cv,-r.w/2,-r.h/2,r.w,r.h);
+    if(preview&&state.tab==="logos"&&i===state.al){const d=Math.max(1,CW/400);g.lineWidth=2*d;g.strokeStyle="#fff";g.setLineDash([7*d,5*d]);
+      g.shadowColor="rgba(0,0,0,.5)";g.shadowBlur=3*d;g.strokeRect(-r.w/2-4*d,-r.h/2-4*d,r.w+8*d,r.h+8*d)}
+    g.restore()});
 }
 let raf=0;function draw(){if(!raf)raf=requestAnimationFrame(()=>{raf=0;drawNow()})}
 function drawNow(){
@@ -579,7 +583,7 @@ $("fileP").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)addProd
 const TABS=["fondo","logos","ajustar","retocar"];
 TABS.forEach(t=>{$("b-"+t).onclick=()=>{state.tab=t;
   TABS.forEach(u=>{$("b-"+u).setAttribute("aria-selected",u===t);$("t-"+u).hidden=u!==t});
-  $("hint").textContent=t==="retocar"?"Pasa un dedo para retocar. Usa dos dedos para mover o cambiar el tamaño.":t==="logos"?"Arrastra un logo para moverlo y pellizca para cambiar su tamaño.":"Arrastra la prenda o un logo para moverlos, y pellizca para cambiar su tamaño.";
+  $("hint").textContent=t==="retocar"?"Pasa un dedo para retocar. Usa dos dedos para mover o cambiar el tamaño.":t==="logos"?"Arrastra un logo para moverlo. Con dos dedos cambias su tamaño y lo giras.":"Arrastra la prenda o un logo para moverlos, y pellizca para cambiar su tamaño.";
   draw()}});
 
 /* ---------- controles ---------- */
@@ -632,7 +636,7 @@ async function addLogo(def,silent){
   state.logos.push(lg);return lg;
 }
 function saveLogos(){
-  const pos={};state.logos.forEach(l=>pos[l.id]={on:l.on,x:l.x,y:l.y,w:l.w});
+  const pos={};state.logos.forEach(l=>pos[l.id]={on:l.on,x:l.x,y:l.y,w:l.w,r:l.r||0});
   try{localStorage.setItem(NS+"logoPos",JSON.stringify(pos))}catch(e){}
   try{localStorage.setItem(NS+"logosMios",JSON.stringify(state.logos.filter(l=>l.custom).map(l=>({id:l.id,n:l.n,d:l.src,mode:l.mode}))))}
   catch(e){if(!saveLogos._w){saveLogos._w=1;toast("El logo queda disponible mientras la página esté abierta, pero no hay espacio para recordarlo después.",4200)}}
@@ -654,11 +658,18 @@ function renderLogos(){
 function renderLogoCtl(){
   const lg=state.logos[state.al],show=!!(lg&&lg.on);$("lgCtl").hidden=!show;if(!show)return;
   $("lgName").textContent="Ajustando: "+lg.n;$("lw").value=Math.round(lg.w*100);$("lwo").textContent=Math.round(lg.w*100)+"%";
+  syncRot(lg);
   $("lgMode").hidden=!(lg.custom&&lg.solid);$("lmAll").setAttribute("aria-pressed",lg.mode==="all");$("lmEdge").setAttribute("aria-pressed",lg.mode==="edge");
   $("lgDel").hidden=!lg.custom;
 }
 $("lw").oninput=()=>{const lg=state.logos[state.al];if(!lg)return;lg.w=$("lw").value/100;$("lwo").textContent=$("lw").value+"%";draw();saveLogosSoon()};
 $("lgCenter").onclick=()=>{const lg=state.logos[state.al];if(lg){lg.x=.5;draw();saveLogos()}};
+/* Giro: grados en pantalla, radianes internamente */
+const deg=r=>{let v=Math.round((r||0)*180/Math.PI);while(v>180)v-=360;while(v<-180)v+=360;return v};
+function syncRot(lg){const v=deg(lg.r);$("lr").value=v;$("lro").textContent=v+"°"}
+$("lr").oninput=()=>{const lg=state.logos[state.al];if(!lg)return;let v=+$("lr").value;if(Math.abs(v)<=2)v=0;
+  lg.r=v*Math.PI/180;$("lro").textContent=v+"°";draw();saveLogosSoon()};
+$("lgStraight").onclick=()=>{const lg=state.logos[state.al];if(!lg)return;lg.r=0;syncRot(lg);draw();saveLogos()};
 $("lgOff").onclick=()=>{const lg=state.logos[state.al];if(!lg)return;lg.on=false;state.al=state.logos.findIndex(l=>l.on);renderLogos();saveLogos();draw()};
 $("lgDel").onclick=()=>{const lg=state.logos[state.al];if(!lg||!lg.custom)return;state.logos.splice(state.al,1);state.al=state.logos.findIndex(l=>l.on);renderLogos();saveLogos();draw();toast("Logo eliminado")};
 async function setMode(m){const lg=state.logos[state.al];if(!lg||lg.mode===m)return;lg.mode=m;
@@ -679,7 +690,9 @@ $("fileL").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)
 const ptrs=new Map();let gest=null,brushAt=null,lastStamp=null;
 function cssToCanvas(e){const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top,w:r.width,h:r.height}}
 function hitLogo(pt){for(let i=state.logos.length-1;i>=0;i--){const lg=state.logos[i];if(!lg.on||!lg.cv)continue;
-  const r=logoRect(lg,pt.w,pt.h),p=10;if(pt.x>=r.x-p&&pt.x<=r.x+r.w+p&&pt.y>=r.y-p&&pt.y<=r.y+r.h+p)return i}return -1}
+  const r=logoRect(lg,pt.w,pt.h),p=10,a=-(lg.r||0),dx=pt.x-(r.x+r.w/2),dy=pt.y-(r.y+r.h/2);
+  const lx=dx*Math.cos(a)-dy*Math.sin(a),ly=dx*Math.sin(a)+dy*Math.cos(a);
+  if(Math.abs(lx)<=r.w/2+p&&Math.abs(ly)<=r.h/2+p)return i}return -1}
 function stamp(pt){
   const it=cur(),L=layout(it,pt.w,pt.h);
   const sx=(pt.x-L.x)/L.k,sy=(pt.y-L.y)/L.k,R=state.brush/2/L.k;
@@ -707,7 +720,7 @@ cv.addEventListener("pointerdown",e=>{
   }else if(ptrs.size===1&&gest){
     cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,pt);
     const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-    if(gest.t==="logo"||gest.t==="lpinch"){const lg=state.logos[gest.i];gest={t:"lpinch",i:gest.i,d,m,w0:lg.w,x:lg.x,y:lg.y}}
+    if(gest.t==="logo"||gest.t==="lpinch"){const lg=state.logos[gest.i];gest={t:"lpinch",i:gest.i,d,m,w0:lg.w,x:lg.x,y:lg.y,r0:lg.r||0,a0:Math.atan2(b.y-a.y,b.x-a.x)}}
     else if(productReady()){const it=cur();
       if(gest.t==="paint"){it.edits=it.undo.pop();rebuild(it);$("undo").disabled=!it.undo.length}
       gest={t:"pinch",d,m,s:it.p.s,cx:it.p.cx,by:it.p.by,w:a.w,h:a.h};brushAt=null}
@@ -721,7 +734,9 @@ cv.addEventListener("pointermove",e=>{
   if(gest.t==="logo"){const lg=state.logos[gest.i];lg.x=gest.x+(pt.x-gest.p.x)/pt.w;lg.y=gest.y+(pt.y-gest.p.y)/pt.h}
   else if(gest.t==="lpinch"&&ptrs.size>=2){const lg=state.logos[gest.i],[a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
     lg.w=Math.max(.05,Math.min(1.2,gest.w0*d/gest.d));lg.x=gest.x+(m.x-gest.m.x)/pt.w;lg.y=gest.y+(m.y-gest.m.y)/pt.h;
-    if(state.tab==="logos"){$("lw").value=Math.round(lg.w*100);$("lwo").textContent=Math.round(lg.w*100)+"%"}}
+    // girar con los dos dedos; se "imanta" a 0°, 90°, 180° y -90° para enderezar fácil
+    let r=gest.r0+Math.atan2(b.y-a.y,b.x-a.x)-gest.a0;const q=Math.PI/2,near=Math.round(r/q)*q;if(Math.abs(r-near)<.06)r=near;lg.r=r;
+    if(state.tab==="logos"){$("lw").value=Math.round(lg.w*100);$("lwo").textContent=Math.round(lg.w*100)+"%";syncRot(lg)}}
   else if(!it||!it.ready)return;
   else if(gest.t==="move"){it.p.cx=gest.cx+(pt.x-gest.p.x)/pt.w;it.p.by=gest.by+(pt.y-gest.p.y)/pt.h}
   else if(gest.t==="paint"){brushAt=pt;strokeTo(pt)}
@@ -806,7 +821,7 @@ if("serviceWorker" in navigator&&location.protocol==="https:"){
   let pos={},mine=[];try{pos=JSON.parse(recall("logoPos")||"{}")||{}}catch(e){}try{mine=JSON.parse(recall("logosMios")||"[]")||[]}catch(e){}
   for(const d of window.__LOGOS)try{await addLogo(d)}catch(e){}
   for(const d of mine)try{await addLogo(Object.assign({},d,{custom:true}))}catch(e){}
-  state.logos.forEach(l=>{const p=pos[l.id];if(p){l.on=!!p.on;if(typeof p.x==="number"){l.x=p.x;l.y=p.y;l.w=p.w}}});
+  state.logos.forEach(l=>{const p=pos[l.id];if(p){l.on=!!p.on;if(typeof p.x==="number"){l.x=p.x;l.y=p.y;l.w=p.w;l.r=p.r||0}}});
   state.al=state.logos.findIndex(l=>l.on);
   renderBgs();renderLogos();renderStrip();syncControls();sizeStage();
   window.addEventListener("resize",sizeStage);
