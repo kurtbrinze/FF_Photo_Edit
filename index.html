@@ -68,7 +68,11 @@ header p{margin:0;color:var(--muted);font-size:.9rem}
 .thumb .ok{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#2e8b57;color:#fff;font-size:.7rem;display:grid;place-items:center;font-weight:700}
 .thumb .ok[hidden]{display:none}
 .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.inst{padding:7px 12px;font-size:.9rem;border-color:var(--accent);color:var(--accent);background:transparent}
+header{position:relative}
+.hdr{display:flex;align-items:center;flex:none}
+.hd h1{min-width:0;font-size:clamp(1.15rem,5.4vw,1.45rem);white-space:nowrap}
+.ver{position:absolute;top:-10px;right:0;font-size:.68rem;line-height:1;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.inst{padding:6px 10px;font-size:.82rem;white-space:nowrap;border-color:var(--accent);color:var(--accent);background:transparent}
 .update{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;font-size:.92rem}
 .update[hidden],.inst[hidden]{display:none}
 [hidden]{display:none!important}
@@ -132,7 +136,10 @@ dialog img{width:100%;border-radius:8px;display:block;margin:10px 0}
   <header>
     <div class="hd">
       <h1>Estudio de fondos</h1>
-      <button class="btn inst" id="install" hidden>Instalar app</button>
+      <div class="hdr">
+        <button class="btn inst" id="install" hidden>Instalar app</button>
+        <span class="ver" title="Versión de la app">V.5</span>
+      </div>
     </div>
     <p>Cambia el fondo de tus prendas, una a la vez</p>
   </header>

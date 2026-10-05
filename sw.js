@@ -1,7 +1,7 @@
 /* Estudio de fondos: permite abrir la app sin internet.
    IMPORTANTE: cada vez que subas un index.html nuevo, cambia VERSION
    (por ejemplo "v2", "v3"...). Así los celulares detectan la actualización. */
-const VERSION = "v5";
+const VERSION = "v5.1";
 const CACHE = "estudio-fondos-" + VERSION;
 const FILES = [
   "./",
